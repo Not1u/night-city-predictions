@@ -1,0 +1,10 @@
+# Replace this environment variable with the selected domain, without a scheme.
+{$SITE_DOMAIN} {
+    encode zstd gzip
+    request_body {
+        max_size 8KB
+    }
+    reverse_proxy 127.0.0.1:8788 {
+        header_up X-Real-IP {remote_host}
+    }
+}

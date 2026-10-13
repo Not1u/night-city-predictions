@@ -1,0 +1,26 @@
+[Unit]
+Description=Night City website
+After=network.target
+
+[Service]
+Type=simple
+User=nightcity
+Group=nightcity
+WorkingDirectory=/opt/night-city
+EnvironmentFile=/etc/night-city.env
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=256
+ExecStart=/usr/bin/node --import tsx apps/server/index.ts
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/night-city
+MemoryMax=512M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

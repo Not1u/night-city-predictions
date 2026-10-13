@@ -1,6 +1,6 @@
 import { ApiError, type ApiEnvelope, type ApiFailure, type Me, type Round, type RoundCharacter, type Page, type LedgerEntry, type Prediction, type PredictionRequest, assertPoints } from '@night-city/contracts';
 import { demoRounds, emptyRoundCharacters } from '../../../packages/contracts/src/fixtures';
-import { authToken, signOut } from './auth';
+import { authToken, signOut, passwordAuth } from './auth';
 import type { GameRequest, GameReceipt, GameHistory, Leaderboard } from '@night-city/contracts';
 export interface Client {
   mode: 'mock' | 'api'; serverOffset: number;
@@ -83,10 +83,10 @@ class HttpClient implements Client {
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     let response: Response;
     const needsAuth = path.startsWith('/me') || path.startsWith('/auth') || (init?.method && init.method !== 'GET');
-    const token = needsAuth ? await authToken() : null;
+    const token = needsAuth && !passwordAuth ? await authToken() : null;
     const headers = new Headers(init?.headers);
     if (token) headers.set('Authorization',`Bearer ${token}`);
-    try { response = await fetch((import.meta.env?.VITE_API_BASE_URL ?? '') + '/api/v1' + path, { ...init, headers, signal: AbortSignal.timeout(15000) }); }
+    try { response = await fetch((import.meta.env?.VITE_API_BASE_URL ?? '') + '/api/v1' + path, { ...init, headers, credentials:'include', signal: AbortSignal.timeout(15000) }); }
     catch { throw new ApiError('NETWORK_ERROR','无法连接服务，请检查网络后重试'); }
     let json: ApiEnvelope<T> | ApiFailure;
     try { json = await response.json(); } catch { throw new ApiError('NETWORK_ERROR','服务暂时不可用，请稍后重试'); }
@@ -97,14 +97,14 @@ class HttpClient implements Client {
   private disabled(): never { throw new ApiError('FEATURE_NOT_READY','当前开放账户与签到；预测和社区稍后开放'); }
   async rounds() { return (await this.request<Page<Round>>('/rounds')).items; }
   async characters(id:string) { return (await this.request<Page<RoundCharacter>>(`/rounds/${encodeURIComponent(id)}/characters`)).items; }
-  async me():Promise<Me|null> { if (!await authToken()) return null; try{return await this.request<Me>('/me');}catch(e){if(e instanceof ApiError && e.code==='UNAUTHENTICATED') return null; throw e;} }
+  async me():Promise<Me|null> { if (!passwordAuth && !await authToken()) return null; try{return await this.request<Me>('/me');}catch(e){if(e instanceof ApiError && e.code==='UNAUTHENTICATED') return null; throw e;} }
   async login(name?:string){await this.request('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true,display_name:name})});}
   async profile(name:string){await this.request('/me/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name:name})});}
   async refund(id:string){await this.request(`/predictions/${encodeURIComponent(id)}/refund`,{method:'POST'});}
   async play(game:'roulette'|'slots',body:GameRequest,key:string){return this.request<GameReceipt>(`/games/${game}/play`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});}
   async games(){return (await this.request<Page<GameHistory>>('/me/games')).items;}
   async leaderboard(kind:'lottery'|'arcade'){return this.request<Leaderboard>(`/leaderboard?kind=${kind}`);}
-  async logout(){await signOut();}
+  async logout(){if(passwordAuth)await this.request('/auth/logout',{method:'POST'});else await signOut();}
   async checkIn(key:string){await this.request('/check-ins',{method:'POST',headers:{'Idempotency-Key':key}});}
   async predict(id:string,body:PredictionRequest,key:string){await this.request(`/rounds/${encodeURIComponent(id)}/predictions`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});}
   async ledger(){return (await this.request<Page<LedgerEntry>>('/me/ledger')).items;}

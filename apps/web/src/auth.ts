@@ -3,7 +3,8 @@ import { ApiError } from '@night-city/contracts';
 
 const endpoint = import.meta.env?.VITE_APPWRITE_ENDPOINT;
 const project = import.meta.env?.VITE_APPWRITE_PROJECT_ID;
-export const emailAuthReady = !!endpoint && !!project;
+export const passwordAuth = import.meta.env?.VITE_AUTH_MODE === 'password';
+export const emailAuthReady = !passwordAuth && !!endpoint && !!project;
 const account = emailAuthReady ? new Account(new Client().setEndpoint(endpoint).setProject(project)) : null;
 let jwt: { token: string; expires: number } | null = null;
 

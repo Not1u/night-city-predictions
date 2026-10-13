@@ -8,5 +8,10 @@ dist/
 *.log
 coverage/
 .tools/
+.data/
+backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *-任务书.md
 任务书.md

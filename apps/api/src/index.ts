@@ -5,7 +5,7 @@ import { accountInfo, checkIn } from './account';
 import { play, predict, refundTest } from './play';
 import { updateProfile } from './profile';
 import { leaderboard } from './leaderboard';
-export interface Env extends EmailAuthEnv { ALLOWED_ORIGIN: string }
+export interface Env extends EmailAuthEnv { ALLOWED_ORIGIN: string; PASSWORD_AUTH?: boolean; SESSION_COOKIE?: string }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -19,14 +19,14 @@ export default {
       headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
     }
     const ok = (data: unknown) => Response.json({ data, meta }, { headers });
-    const authenticate = () => env.APPWRITE_PROJECT_ID ? emailUser(request, env) : requireUser(request, env.DB);
+    const authenticate = () => env.PASSWORD_AUTH ? requireUser(request, env.DB, new Date(), env.SESSION_COOKIE, true) : env.APPWRITE_PROJECT_ID ? emailUser(request, env) : requireUser(request, env.DB);
     try {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
       if (request.method !== 'GET' && origin !== env.ALLOWED_ORIGIN) throw new ApiError('FORBIDDEN', '请求来源不被允许', 403);
-      if (url.pathname === '/api/v1/health' && request.method === 'GET') return ok({ status: 'ok', phase: 'arcade-3d-beta', accounts_enabled: !!env.APPWRITE_PROJECT_ID, predictions_enabled: true, comments_enabled: false, games_enabled: true });
+      if (url.pathname === '/api/v1/health' && request.method === 'GET') return ok({ status: 'ok', phase: env.PASSWORD_AUTH?'password-beta':'arcade-3d-beta', accounts_enabled: !!env.APPWRITE_PROJECT_ID||!!env.PASSWORD_AUTH, predictions_enabled: true, comments_enabled: false, games_enabled: true });
       if (/^\/api\/v1\/(characters\/[^/]+\/comments|comments(?:\/.*)?)$/.test(url.pathname)) throw new ApiError('FEATURE_NOT_READY','留言功能已关闭',410);
       if(url.pathname==='/api/v1/leaderboard'&&request.method==='GET')return ok(await leaderboard(env.DB,url.searchParams.get('kind')||'lottery'));
-      if (url.pathname === '/api/v1/auth/register' && request.method === 'POST') return ok(await registerEmailUser(request,env));
+      if (url.pathname === '/api/v1/auth/register' && request.method === 'POST' && !env.PASSWORD_AUTH) return ok(await registerEmailUser(request,env));
       if (url.pathname.startsWith('/api/v1/admin/')) {
         requireAdmin(await authenticate());
         if (request.method !== 'GET') throw new ApiError('STEP_UP_REQUIRED', '管理员二次验证尚未接入', 403);

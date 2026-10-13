@@ -3,8 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=22.13.0" },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "vite apps/web --host 127.0.0.1",
     "dev:admin": "vite apps/admin --host 127.0.0.1 --port 5174",
@@ -15,7 +20,10 @@
     "check": "npm run typecheck && npm test",
     "build": "vite build apps/web && vite build apps/admin",
     "build:pages": "vite build apps/web --base ./",
-    "build:api": "wrangler deploy --dry-run --config apps/api/wrangler.jsonc --outdir dist/api"
+    "build:api": "wrangler deploy --dry-run --config apps/api/wrangler.jsonc --outdir dist/api",
+    "build:server": "node scripts/build-server.mjs",
+    "start:server": "tsx apps/server/index.ts",
+    "account:claim": "tsx apps/server/claim.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261013.1",

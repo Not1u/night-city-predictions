@@ -2,6 +2,10 @@
 
 在线地址：[死人大乐透](https://not1u.github.io/night-city-predictions/)。前台由 GitHub Pages 发布，Cloudflare Workers + D1 保存本站账户与积分；Appwrite 提供邮箱验证码和会话管理。
 
+## 独立服务器版本（待部署）
+
+新增同域 Node.js + SQLite 用户名密码版，可通过 `npm run build:server` 构建，账户恢复不需要邮箱。注册、改密、限速、会话撤销和数据隔离已有测试；部署样板在 `deploy/`。旧站暂未切换，服务器采购、数据迁移、国内线路验证与完整管理后台仍待完成。详见[管理与迁移说明](docs/operations/site-management.md#准备中的独立服务器密码版尚未切换线上)。
+
 ## 当前公开版本：立体游艺厅、获奖榜与公告
 
 - 原创夜城电台黑色幽默文案；标题和按钮使用短促 RGB 故障动效，可暂停，尊重减少动态效果设置。
