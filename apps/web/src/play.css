@@ -1,0 +1,51 @@
+/* Short RGB displacement bursts, with no full-screen flashes. */
+.glitch-title { position:relative; display:inline-block; font-weight:inherit; }
+.glitch-title::before,.glitch-title::after { content:attr(data-text);position:absolute;inset:0;pointer-events:none;opacity:0; }
+html[data-motion=on] .glitch-title::before { color:#36edf2;clip-path:inset(22% 0 47%);animation:signal-cyan 7s infinite steps(1); }
+html[data-motion=on] .glitch-title::after { color:#ff355d;clip-path:inset(57% 0 17%);animation:signal-red 7s infinite steps(1); }
+@keyframes signal-cyan {0%,89%,96%,100%{opacity:0;transform:none}90%,93%{opacity:.8;transform:translate(-5px,1px)}91%,94%{opacity:.6;transform:translate(4px,-1px)}}
+@keyframes signal-red {0%,89%,96%,100%{opacity:0;transform:none}90%,93%{opacity:.8;transform:translate(5px,-1px)}92%,95%{opacity:.65;transform:translate(-3px,1px)}}
+@keyframes signal-button {0%,100%{transform:translateY(-2px);text-shadow:none}24%{transform:translate(-2px,-2px);text-shadow:2px 0 #e42968,-2px 0 #00a1ae}48%{transform:translate(2px,-2px);text-shadow:-2px 0 #e42968,2px 0 #00a1ae}76%{transform:translate(-1px,-2px);text-shadow:1px 0 #e42968}}
+@media(hover:hover){html[data-motion=on] .button:hover:not(:disabled){animation:signal-button .34s steps(2) 1;}html[data-motion=on] .portrait:hover .character-image{filter:drop-shadow(3px 0 #ff174566) drop-shadow(-3px 0 #00e5ef55);}}
+.header nav a,.header nav button {padding-inline:15px;}
+.header .avatar {white-space:nowrap;min-width:36px;padding:0;font-size:11px;}
+.field select {width:100%;padding:12px;color:#fff;background:#17171b;border:1px solid #514651;font:inherit;min-height:48px;}
+[hidden] {display:none!important;}
+.arcade {padding:95px 0 75px;border-top:1px solid #403938;scroll-margin-top:25px;}
+.arcade h2,.community-section h2 {font-size:clamp(29px,3.6vw,51px);line-height:1.25;letter-spacing:-1px;margin:13px 0;}
+.arcade h2 span,.community-section h2 span{color:var(--yellow);}
+.arcade-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.arcade-card{position:relative;overflow:hidden;border:1px solid #5c4647;background:linear-gradient(130deg,#181017,#0c0c10 70%);padding:30px;display:grid;grid-template-columns:minmax(120px,.8fr) 1.2fr;align-items:center;gap:24px;}
+.arcade-card:after{content:'SIGNAL / 2077';position:absolute;top:13px;right:16px;color:#a48f93;font:9px monospace;letter-spacing:2px;}
+.arcade-card h3{font-size:28px;margin:10px 0;}.arcade-card p{color:#bdb4ba;line-height:1.8;font-size:13px;margin-bottom:22px;}.arcade-card small{color:#f27588;letter-spacing:2px;font:10px monospace;}
+.arcade-art{min-height:180px;display:flex;align-items:center;justify-content:center;}
+.wheel-art{min-height:0;aspect-ratio:1;border-radius:50%;border:6px solid #766a36;background:repeating-conic-gradient(#b51b42 0deg 10deg,#13131a 10deg 20deg);box-shadow:0 0 0 5px #211f21,inset 0 0 0 14px #0004;position:relative;}
+.wheel-art b{display:grid;place-items:center;background:#14121a;border:1px solid #cabe62;border-radius:50%;width:50%;height:50%;font:32px monospace;color:var(--yellow);}.wheel-art>span{position:absolute;top:4px;background:#134931;color:#ecffe1;padding:3px 9px;}
+.slot-art{gap:5px;}.slot-art span{display:grid;place-items:center;min-width:30%;height:90px;background:linear-gradient(#171519,#393032,#171519);border-block:2px solid #edc22f;color:var(--yellow);font:32px monospace;}
+.arcade-note{color:#aaa2a8;font-size:12px;line-height:1.8;margin-top:20px;}
+.community-section{display:flex;align-items:center;justify-content:space-between;gap:25px;padding:50px 35px;background:linear-gradient(100deg,#211316,#111016);border-left:3px solid #e23c5c;margin-bottom:80px;}.community-section p{color:#bbb0b7;max-width:700px;line-height:1.8;}
+.comment-line{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.8;}.comment-line b{color:var(--yellow);}.comment-line span{color:#ebe2e6;}.comment-feedback{color:var(--yellow);font-size:12px;min-height:18px;}
+#comment-list{max-height:42vh;overflow-y:auto;}.comment>div{justify-content:space-between;}.comment small{color:#a99ba4;}
+.game-machine{margin:25px 0;padding:24px;border:1px solid #594650;background:radial-gradient(ellipse at center,#30202d,#0b0a10);overflow:hidden;}
+.roulette-display{width:150px;height:150px;margin:auto;display:flex;flex-direction:column;justify-content:center;align-items:center;border-radius:50%;border:8px double #ba3457;box-shadow:0 0 0 6px #282027;}.roulette-display span{font:11px monospace;letter-spacing:3px;color:#ad909b;}.roulette-display b{font:64px monospace;color:var(--yellow);}
+.slot-reels{display:flex;justify-content:center;gap:10px;}.slot-reels span{display:grid;place-items:center;min-width:75px;height:105px;color:var(--yellow);font:40px monospace;border-block:2px solid #b69643;background:linear-gradient(#19131c,#443138,#19131c);}
+html[data-motion=on] .is-spinning .roulette-display{animation:machine-pulse .7s ease-in-out infinite alternate;}
+html[data-motion=on] .is-spinning .slot-reels span{animation:reel-signal .4s linear infinite alternate;}.is-spinning .slot-reels span:nth-child(2){animation-delay:.1s!important;}.is-spinning .slot-reels span:nth-child(3){animation-delay:.2s!important;}
+@keyframes machine-pulse{to{transform:rotate(12deg);border-color:#e8c54b;opacity:.65}}
+@keyframes reel-signal{to{transform:translateY(7px);filter:blur(3px);opacity:.4}}
+.game-machine.is-win{border-color:var(--yellow);box-shadow:inset 0 0 30px #fcee0a12;}
+.game-inputs{display:grid;grid-template-columns:1fr 1.4fr;gap:15px;}.game-message{min-height:44px;color:var(--yellow);line-height:1.7;font-size:13px;}
+.game-rules{margin:22px 0;color:#bcaeb7;font-size:12px;line-height:1.85;}.game-rules summary{color:#e4ced7;cursor:pointer;padding:12px 0;border-block:1px solid #44343e;}.game-rules p{margin-top:15px;}
+#game-history-list p{font-size:12px;border-bottom:1px solid #342c32;padding:12px 0;color:#b3a7ae;}
+.ledger-row{gap:12px;flex-wrap:wrap;}
+@media(max-width:1100px){.arcade-card{grid-template-columns:1fr;}.arcade-art{max-width:180px;width:100%;margin:auto;}.header nav a,.header nav button{padding-inline:10px;}}
+@media(max-width:780px){.arcade-grid{grid-template-columns:1fr;}.arcade-card{grid-template-columns:100px 1fr;padding:24px 18px;gap:16px;}.arcade-art{min-height:100px;}.wheel-art b{font-size:24px;}.slot-art span{height:65px;font-size:23px;}.arcade-card h3{font-size:24px;}.arcade{padding-block:55px;}.community-section{display:block;padding:28px 20px;margin-bottom:45px;}.community-section .button{margin-top:16px;}.game-inputs{grid-template-columns:1fr;}.slot-reels span{min-width:65px;font-size:32px;}.header nav{display:flex;flex-wrap:wrap;}.header nav a,.header nav button{padding-inline:9px;font-size:11px;}}
+@media(prefers-reduced-motion:reduce){.glitch-title:before,.glitch-title:after{display:none!important;}.button,.game-machine *{animation:none!important;}}
+html[data-motion=off] .glitch-title:before,html[data-motion=off] .glitch-title:after{display:none;}
+@media(max-width:780px){
+ .header{display:grid;grid-template-columns:minmax(0,1fr) auto;height:auto;gap:15px;align-items:center;}
+ .header .brand{min-width:0;white-space:nowrap;}.header .brand small{letter-spacing:1px;}
+ .header #account{grid-column:2;grid-row:1;}.header .wallet{white-space:nowrap;padding:8px 10px;}
+ .header nav{grid-column:1/-1;grid-row:2;width:100%;height:40px;display:flex;flex-wrap:nowrap;justify-content:space-around;transform:none;}
+ .header nav a,.header nav button{transform:none;white-space:nowrap;padding:0 6px;font-size:11px;}
+}

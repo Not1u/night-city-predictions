@@ -9,6 +9,7 @@ export type UTCDateTime = string;
 export type RoundStatus = 'draft' | 'open' | 'closed' | 'result_pending' | 'settled' | 'refunded';
 export interface Ratio { numerator: number; denominator: number }
 export interface Round {
+  is_test?: boolean | number;
   id: ID; episode: number; title: string; status: RoundStatus;
   opens_at: UTCDateTime | null; closes_at: UTCDateTime | null;
   previous_round_id: ID | null; pool_total: number; participant_count: number;
@@ -29,6 +30,7 @@ export interface User { id: ID; display_name: string; role: 'user' | 'admin' }
 export interface Wallet { balance: number; currency: 'EUR_NC'; checked_in_today: boolean }
 export interface Me { user: User; wallet: Wallet }
 export interface Prediction {
+  cancelled_at?: string | null;
   id: ID; round_id: ID; character_id: ID; user_id: ID; amount: number;
   created_at: UTCDateTime; payout: number | null;
 }
@@ -72,7 +74,10 @@ export interface PredictionResponse { prediction: Prediction; wallet: Wallet }
 export interface CheckInResponse { reward: number; date: string; wallet: Wallet; ledger: LedgerEntry }
 export interface CommentRequest { body: string }
 /** Email ownership is checked by Appwrite; the API accepts only a verified bearer JWT. */
-export interface RegisterRequest { consent: true }
+export interface RegisterRequest { consent: true; display_name?: string }
+export interface GameRequest { stake:number; choice?:string; number?:number }
+export interface GameReceipt { id:string; game:'roulette'|'slots'; stake:number; payout:number; multiplier:number; balance:number; result:{number?:number;symbols?:string[]}; created_at:string }
+export interface GameHistory { id:string;game:'roulette'|'slots';stake:number;payout:number;result_json:string;created_at:string }
 export interface ReportRequest { reason: 'spoiler' | 'abuse' | 'spam' | 'other'; detail?: string }
 export interface AdminRoundRequest { episode: number; title: string; opens_at: UTCDateTime; closes_at: UTCDateTime; previous_round_id: ID | null }
 export interface AdminCharacterRequest { name: string; codename: string; group: Character['group']; bio: string; source_url: string | null }
@@ -89,6 +94,11 @@ export const routes: readonly RouteSpec[] = [
   { method: 'GET', path: '/api/v1/auth/session', auth: 'user', phase: 'read' },
   { method: 'POST', path: '/api/v1/auth/register', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me', auth: 'user', phase: 'next' },
+  { method: 'PATCH', path: '/api/v1/me/profile', auth: 'user', phase: 'next' },
+  { method: 'GET', path: '/api/v1/me/games', auth: 'user', phase: 'next' },
+  { method: 'POST', path: '/api/v1/games/:game/play', auth: 'user', idempotent: true, phase: 'next' },
+  { method: 'POST', path: '/api/v1/predictions/:id/refund', auth: 'user', idempotent: true, phase: 'next' },
+  { method: 'DELETE', path: '/api/v1/comments/:id', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me/ledger', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me/predictions?round_id=:id', auth: 'user', phase: 'next' },
   { method: 'POST', path: '/api/v1/check-ins', auth: 'user', idempotent: true, phase: 'next' },

@@ -1,4 +1,5 @@
 import { ApiError, type User } from '@night-city/contracts';
+import { username } from '../input';
 
 export interface EmailAuthEnv {
   DB: D1Database;
@@ -35,17 +36,20 @@ export async function emailUser(request: Request, env: EmailAuthEnv): Promise<Us
 export async function registerEmailUser(request: Request, env: EmailAuthEnv): Promise<User> {
   if (!request.headers.get('Content-Type')?.startsWith('application/json')) throw new ApiError('INVALID_INPUT', '请求格式不正确');
   if (Number(request.headers.get('Content-Length') || 0) > 2048) throw new ApiError('INVALID_INPUT', '请求过大');
-  let body: { consent?: boolean };
+  let body: { consent?: boolean; display_name?: string };
   try { const text = await request.text(); if (text.length > 2048) throw new Error(); body = JSON.parse(text); }
   catch { throw new ApiError('INVALID_INPUT', '请求格式不正确'); }
   if (body?.consent !== true) throw new ApiError('INVALID_INPUT', '请确认年满 18 岁及虚拟积分说明');
   const subject = await verifiedEmailSubject(request, env);
+  const existing=await env.DB.prepare('SELECT id,display_name,role FROM users WHERE provider_subject=?').bind(subject).first<User>();
+  if(existing)return existing;
+  const name=username(body.display_name);
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO users(id,display_name,provider_subject,role,created_at) VALUES(?,?,?,'user',?) ON CONFLICT(provider_subject) DO NOTHING").bind(id, `夜城居民 ${id.slice(0,6)}`, subject, now),
+  try { await env.DB.batch([
+    env.DB.prepare("INSERT INTO users(id,display_name,provider_subject,role,created_at,username_key) VALUES(?,?,?,'user',?,?) ON CONFLICT(provider_subject) DO NOTHING").bind(id, name, subject, now,name.toLowerCase()),
     env.DB.prepare('INSERT INTO wallets(user_id,balance,version) SELECT id,0,0 FROM users WHERE provider_subject=? ON CONFLICT(user_id) DO NOTHING').bind(subject),
     env.DB.prepare("INSERT INTO user_consents(user_id,version,accepted_at) SELECT id,'2026-10-14',? FROM users WHERE provider_subject=? ON CONFLICT(user_id) DO NOTHING").bind(now, subject)
-  ]);
+  ]); } catch(e){if(String(e).includes('UNIQUE'))throw new ApiError('INVALID_INPUT','用户名已被使用，请换一个',409);throw e;}
   return (await env.DB.prepare('SELECT id,display_name,role FROM users WHERE provider_subject=?').bind(subject).first<User>())!;
 }

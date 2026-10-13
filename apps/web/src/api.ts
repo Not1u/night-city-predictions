@@ -1,21 +1,30 @@
 import { ApiError, type ApiEnvelope, type ApiFailure, type Me, type Round, type RoundCharacter, type Page, type LedgerEntry, type Prediction, type Comment, type PredictionRequest, assertPoints } from '@night-city/contracts';
 import { demoRounds, emptyRoundCharacters } from '../../../packages/contracts/src/fixtures';
 import { authToken, signOut } from './auth';
+import type { GameRequest, GameReceipt, GameHistory } from '@night-city/contracts';
 export interface Client {
   mode: 'mock' | 'api'; serverOffset: number;
   rounds(): Promise<Round[]>; characters(round: string): Promise<RoundCharacter[]>;
-  me(): Promise<Me | null>; login(): Promise<void>; logout(): Promise<void>;
+  me(): Promise<Me | null>; login(name?:string): Promise<void>; logout(): Promise<void>;
+  profile(name:string):Promise<void>; refund(id:string):Promise<void>;
+  play(game:'roulette'|'slots',body:GameRequest,key:string):Promise<GameReceipt>; games():Promise<GameHistory[]>;
+  removeComment(id:string):Promise<void>;
   checkIn(key: string): Promise<void>; predict(round: string, body: PredictionRequest, key: string): Promise<void>;
   ledger(): Promise<LedgerEntry[]>; predictions(round: string): Promise<Prediction[]>;
-  comments(character: string): Promise<Comment[]>; comment(character: string, body: string): Promise<void>;
+  comments(character: string): Promise<Comment[]>; comment(character: string, body: string, key?:string): Promise<void>;
   report(id: string): Promise<void>;
 }
-interface DemoState { version: 1; rounds: Round[]; loggedIn: boolean; balance: number; date: string | null; ledger: LedgerEntry[]; predictions: Prediction[]; comments: Comment[]; reported: string[]; keys: Record<string,string> }
+interface DemoState { displayName?:string; version: 1; rounds: Round[]; loggedIn: boolean; balance: number; date: string | null; ledger: LedgerEntry[]; predictions: Prediction[]; comments: Comment[]; reported: string[]; keys: Record<string,string> }
 const STORAGE = 'night-city-demo-v1';
 /** Browser-only disposable simulation. Never exported to D1 or used as trusted state. */
 export class MockClient implements Client {
   mode = 'mock' as const; serverOffset = 0;
   private state: DemoState;
+  async profile(name:string){this.auth();this.state.displayName=name;this.save();}
+  async refund(){throw new ApiError('FEATURE_NOT_READY','请在在线测试场退回订单');}
+  async play():Promise<GameReceipt>{throw new ApiError('FEATURE_NOT_READY','小游戏需连接在线服务器');}
+  async games():Promise<GameHistory[]>{return [];}
+  async removeComment(id:string){this.auth();this.state.comments=this.state.comments.filter(c=>c.id!==id);this.save();}
   constructor() {
     const empty: DemoState = { version: 1, rounds: demoRounds(), loggedIn: false, balance: 0, date: null, ledger: [], predictions: [], comments: [], reported: [], keys: {} };
     try {
@@ -44,7 +53,7 @@ export class MockClient implements Client {
       return { ...c, odds: { ...c.odds, stake_total: stake, participant_count: new Set(own.map(p=>p.user_id)).size, live_reference: stake ? { numerator: total, denominator: stake } : null } };
     });
   }
-  async me(): Promise<Me | null> { return this.state.loggedIn ? { user: { id: 'demo-user', display_name: '夜城访客', role: 'user' }, wallet: { balance: this.state.balance, currency: 'EUR_NC', checked_in_today: this.state.date === new Date().toISOString().slice(0,10) } } : null; }
+  async me(): Promise<Me | null> { return this.state.loggedIn ? { user: { id: 'demo-user', display_name: this.state.displayName??'夜城访客', role: 'user' }, wallet: { balance: this.state.balance, currency: 'EUR_NC', checked_in_today: this.state.date === new Date().toISOString().slice(0,10) } } : null; }
   async login() { this.state.loggedIn = true; this.save(); }
   async logout() { this.state.loggedIn = false; this.save(); }
   async checkIn(key: string) {
@@ -75,7 +84,7 @@ export class MockClient implements Client {
     if (!body || body.length > 500) throw new ApiError('INVALID_INPUT','留言应为 1–500 个字符');
     const last=this.state.comments[0];
     if(last && Date.now()-Date.parse(last.created_at)<10000) throw new ApiError('RATE_LIMITED','稍等 10 秒再发送下一条');
-    this.state.comments.unshift({id:crypto.randomUUID(), character_id:character,author:{id:'demo-user',display_name:'夜城访客'},body,created_at:new Date().toISOString(),status:'visible'}); this.save();
+    this.state.comments.unshift({id:crypto.randomUUID(), character_id:character,author:{id:'demo-user',display_name:this.state.displayName??'夜城访客'},body,created_at:new Date().toISOString(),status:'visible'}); this.save();
   }
   async report(id: string) { this.auth(); if(!this.state.comments.some(c=>c.id===id)) throw new ApiError('NOT_FOUND','留言不存在'); if(this.state.reported.includes(id)) throw new ApiError('INVALID_INPUT','这条留言已在本地标记举报'); this.state.reported.push(id); this.save(); }
 }
@@ -99,13 +108,19 @@ class HttpClient implements Client {
   async rounds() { return (await this.request<Page<Round>>('/rounds')).items; }
   async characters(id:string) { return (await this.request<Page<RoundCharacter>>(`/rounds/${encodeURIComponent(id)}/characters`)).items; }
   async me():Promise<Me|null> { if (!await authToken()) return null; try{return await this.request<Me>('/me');}catch(e){if(e instanceof ApiError && e.code==='UNAUTHENTICATED') return null; throw e;} }
-  async login(){await this.request('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true})});}
+  async login(name?:string){await this.request('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true,display_name:name})});}
+  async profile(name:string){await this.request('/me/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name:name})});}
+  async refund(id:string){await this.request(`/predictions/${encodeURIComponent(id)}/refund`,{method:'POST'});}
+  async play(game:'roulette'|'slots',body:GameRequest,key:string){return this.request<GameReceipt>(`/games/${game}/play`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});}
+  async games(){return (await this.request<Page<GameHistory>>('/me/games')).items;}
+  async removeComment(id:string){await this.request(`/comments/${encodeURIComponent(id)}`,{method:'DELETE'});}
   async logout(){await signOut();}
   async checkIn(key:string){await this.request('/check-ins',{method:'POST',headers:{'Idempotency-Key':key}});}
-  async predict(){this.disabled();}
+  async predict(id:string,body:PredictionRequest,key:string){await this.request(`/rounds/${encodeURIComponent(id)}/predictions`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});}
   async ledger(){return (await this.request<Page<LedgerEntry>>('/me/ledger')).items;}
   async predictions(id:string){return (await this.request<Page<Prediction>>(`/me/predictions?round_id=${encodeURIComponent(id)}`)).items;}
   async comments(id:string){return (await this.request<Page<Comment>>(`/characters/${encodeURIComponent(id)}/comments`)).items;}
-  async comment(){this.disabled();} async report(){this.disabled();}
+  async comment(id:string,body:string,key=crypto.randomUUID()){await this.request(`/characters/${encodeURIComponent(id)}/comments`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify({body})});}
+  async report(id:string){await this.request(`/comments/${encodeURIComponent(id)}/reports`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:'other'})});}
 }
 export const client: Client = import.meta.env?.VITE_DATA_MODE === 'api' ? new HttpClient() : new MockClient();
