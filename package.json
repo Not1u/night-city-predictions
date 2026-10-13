@@ -1,0 +1,28 @@
+{
+  "name": "night-city-predictions",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "dev": "vite apps/web --host 127.0.0.1",
+    "dev:admin": "vite apps/admin --host 127.0.0.1 --port 5174",
+    "dev:api": "wrangler dev --config apps/api/wrangler.jsonc --port 8787",
+    "db:migrate": "wrangler d1 migrations apply night-city-local --local --config apps/api/wrangler.jsonc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "npm run typecheck && npm test",
+    "build": "vite build apps/web && vite build apps/admin",
+    "build:pages": "vite build apps/web --base ./",
+    "build:api": "wrangler deploy --dry-run --config apps/api/wrangler.jsonc --outdir dist/api"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261013.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "wrangler": "^4.40.0"
+  }
+}
