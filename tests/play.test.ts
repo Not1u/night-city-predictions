@@ -75,16 +75,3 @@ test('game ledger overflow rolls back the spin and all debits',async t=>{
   assert.equal((await call('/games/slots/play','POST','alice',{stake:5},'overflow-spin')).status,500);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM game_plays').get()!.n,0);assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM ledger WHERE kind='activity_reward'").get()!.n,0);
 });
-test('comments use server usernames, throttle writes, retry safely, hide only by owner or three distinct reports',async t=>{
-  const {call}=await setup(t),path='/characters/city-board/comments';
-  const res=await call(path,'POST','alice',{body:'一条测试信号',author:'冒充'},'comment-key');assert.equal(res.status,200);const id=(await res.json() as any).data.id;
-  assert.equal((await call(path,'POST','alice',{body:'一条测试信号'},'comment-key')).status,200);
-  assert.equal((await call(path,'POST','alice',{body:'第二条'},'comment-key2')).status,429);
-  let items=(await (await call(path)).json() as any).data.items;assert.equal(items.length,1);assert.equal(items[0].author.display_name,'居民alice');
-  assert.equal((await call(`/comments/${id}`,'DELETE','bob')).status,403);
-  for(const who of ['bob','bob','carol'])assert.equal((await call(`/comments/${id}/reports`,'POST',who,{reason:'spam'})).status,200);
-  assert.equal((await (await call(path)).json() as any).data.items.length,1);
-  await call(`/comments/${id}/reports`,'POST','dan',{reason:'spam'});assert.equal((await (await call(path)).json() as any).data.items.length,0);
-  const own=await call('/characters/weak/comments','POST','bob',{body:'角色信号'},'bob-comment');const ownId=(await own.json() as any).data.id;
-  await call(`/comments/${ownId}`,'DELETE','bob');assert.equal((await (await call('/characters/weak/comments')).json() as any).data.items.length,0);
-});

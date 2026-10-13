@@ -3,7 +3,8 @@ import { requireAdmin, requireUser } from './auth/session';
 import { emailUser, registerEmailUser, type EmailAuthEnv } from './auth/email';
 import { accountInfo, checkIn } from './account';
 import { play, predict, refundTest } from './play';
-import { comments, postComment, removeComment, reportComment, updateProfile } from './community';
+import { updateProfile } from './profile';
+import { leaderboard } from './leaderboard';
 export interface Env extends EmailAuthEnv { ALLOWED_ORIGIN: string }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -22,7 +23,9 @@ export default {
     try {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
       if (request.method !== 'GET' && origin !== env.ALLOWED_ORIGIN) throw new ApiError('FORBIDDEN', '请求来源不被允许', 403);
-      if (url.pathname === '/api/v1/health' && request.method === 'GET') return ok({ status: 'ok', phase: 'play-beta', accounts_enabled: !!env.APPWRITE_PROJECT_ID, predictions_enabled: true, comments_enabled: true, games_enabled: true });
+      if (url.pathname === '/api/v1/health' && request.method === 'GET') return ok({ status: 'ok', phase: 'arcade-3d-beta', accounts_enabled: !!env.APPWRITE_PROJECT_ID, predictions_enabled: true, comments_enabled: false, games_enabled: true });
+      if (/^\/api\/v1\/(characters\/[^/]+\/comments|comments(?:\/.*)?)$/.test(url.pathname)) throw new ApiError('FEATURE_NOT_READY','留言功能已关闭',410);
+      if(url.pathname==='/api/v1/leaderboard'&&request.method==='GET')return ok(await leaderboard(env.DB,url.searchParams.get('kind')||'lottery'));
       if (url.pathname === '/api/v1/auth/register' && request.method === 'POST') return ok(await registerEmailUser(request,env));
       if (url.pathname.startsWith('/api/v1/admin/')) {
         requireAdmin(await authenticate());
@@ -53,13 +56,6 @@ export default {
         const rows = await env.DB.prepare('SELECT p.*,sp.amount AS payout FROM predictions p LEFT JOIN payouts sp ON sp.prediction_id=p.id WHERE p.user_id=? AND p.round_id=? ORDER BY p.created_at DESC LIMIT 100').bind(user.id,url.searchParams.get('round_id') || '').all();
         return ok({items:rows.results,next_cursor:null});
       }
-      const commentMatch=url.pathname.match(/^\/api\/v1\/characters\/([^/]+)\/comments$/);
-      if(commentMatch&&request.method==='GET')return ok(await comments(env.DB,commentMatch[1]));
-      if(commentMatch&&request.method==='POST')return ok(await postComment(request,env.DB,await authenticate(),commentMatch[1]));
-      const removeMatch=url.pathname.match(/^\/api\/v1\/comments\/([^/]+)$/);
-      if(removeMatch&&request.method==='DELETE')return ok(await removeComment(env.DB,await authenticate(),removeMatch[1]));
-      const reportMatch=url.pathname.match(/^\/api\/v1\/comments\/([^/]+)\/reports$/);
-      if(reportMatch&&request.method==='POST')return ok(await reportComment(request,env.DB,await authenticate(),reportMatch[1]));
       if (url.pathname === '/api/v1/rounds' && request.method === 'GET') {
         const rows = await env.DB.prepare(`SELECT r.*, COALESCE(SUM(p.amount),0) AS pool_total, COUNT(DISTINCT p.user_id) AS participant_count FROM rounds r LEFT JOIN predictions p ON p.round_id=r.id AND p.cancelled_at IS NULL GROUP BY r.id ORDER BY r.is_test DESC,episode`).all<Round>();
         return ok({ items: rows.results, next_cursor: null });

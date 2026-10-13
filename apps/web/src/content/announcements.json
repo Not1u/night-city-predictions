@@ -1,0 +1,27 @@
+{
+  "lastReviewed": "2026-10-14",
+  "schedule": {
+    "label": "官方当前公布的上线日期",
+    "date": "2026-10-20",
+    "note": "以 Netflix 当地上架和官方后续公告为准。此日期不自动开启预测或触发结算。",
+    "sourceUrl": "https://www.cyberpunk.net/zh-cn/edgerunners2"
+  },
+  "items": [
+    {
+      "id": "premiere",
+      "title": "官方公布《边缘行者 2》上线日期",
+      "summary": "CD PROJEKT RED 公布该动画计划于 10 月 20 日登陆 Netflix。这里只摘记上线信息，不展示预告片画面或剧情细节。",
+      "publishedAt": "2026-08-21",
+      "source": "CD PROJEKT RED",
+      "url": "https://www.cdprojekt.com/en/media/news/cyberpunk-edgerunners-2-premiere-date-announced-alongside-new-trailer/"
+    },
+    {
+      "id": "official-site",
+      "title": "官方作品站与观看入口",
+      "summary": "作品官网提供 Netflix 入口与后续资讯。外部页面可能包含角色介绍和预告内容，是否继续阅读由你决定。",
+      "publishedAt": null,
+      "source": "Cyberpunk 官方网站",
+      "url": "https://www.cyberpunk.net/zh-cn/edgerunners2"
+    }
+  ]
+}

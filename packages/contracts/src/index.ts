@@ -78,6 +78,7 @@ export interface RegisterRequest { consent: true; display_name?: string }
 export interface GameRequest { stake:number; choice?:string; number?:number }
 export interface GameReceipt { id:string; game:'roulette'|'slots'; stake:number; payout:number; multiplier:number; balance:number; result:{number?:number;symbols?:string[]}; created_at:string }
 export interface GameHistory { id:string;game:'roulette'|'slots';stake:number;payout:number;result_json:string;created_at:string }
+export interface Leaderboard { kind:'lottery'|'arcade';period:string;items:{rank:number;display_name:string;net_points:number;wins:number}[];updated_at:string }
 export interface ReportRequest { reason: 'spoiler' | 'abuse' | 'spam' | 'other'; detail?: string }
 export interface AdminRoundRequest { episode: number; title: string; opens_at: UTCDateTime; closes_at: UTCDateTime; previous_round_id: ID | null }
 export interface AdminCharacterRequest { name: string; codename: string; group: Character['group']; bio: string; source_url: string | null }
@@ -88,6 +89,7 @@ export interface StepUpResponse { proof: string; expires_at: UTCDateTime }
 export interface DomainEvent<T> { schema_version: 1; sequence: number; round_id: ID; type: 'odds.updated' | 'round.closed' | 'round.settled' | 'comment.created'; data: T }
 export interface RouteSpec { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; auth: 'public' | 'user' | 'admin' | 'step_up'; idempotent?: boolean; phase: 'read' | 'next' }
 export const routes: readonly RouteSpec[] = [
+  { method: 'GET', path: '/api/v1/leaderboard', auth: 'public', phase: 'read' },
   { method: 'GET', path: '/api/v1/rounds', auth: 'public', phase: 'read' },
   { method: 'GET', path: '/api/v1/rounds/:id/characters', auth: 'public', phase: 'read' },
   { method: 'GET', path: '/api/v1/rounds/:id/odds', auth: 'public', phase: 'read' },
@@ -98,14 +100,10 @@ export const routes: readonly RouteSpec[] = [
   { method: 'GET', path: '/api/v1/me/games', auth: 'user', phase: 'next' },
   { method: 'POST', path: '/api/v1/games/:game/play', auth: 'user', idempotent: true, phase: 'next' },
   { method: 'POST', path: '/api/v1/predictions/:id/refund', auth: 'user', idempotent: true, phase: 'next' },
-  { method: 'DELETE', path: '/api/v1/comments/:id', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me/ledger', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me/predictions?round_id=:id', auth: 'user', phase: 'next' },
   { method: 'POST', path: '/api/v1/check-ins', auth: 'user', idempotent: true, phase: 'next' },
   { method: 'POST', path: '/api/v1/rounds/:id/predictions', auth: 'user', idempotent: true, phase: 'next' },
-  { method: 'GET', path: '/api/v1/characters/:id/comments', auth: 'public', phase: 'next' },
-  { method: 'POST', path: '/api/v1/characters/:id/comments', auth: 'user', phase: 'next' },
-  { method: 'POST', path: '/api/v1/comments/:id/reports', auth: 'user', phase: 'next' },
   { method: 'POST', path: '/api/v1/auth/logout', auth: 'user', phase: 'next' },
   { method: 'POST', path: '/api/v1/admin/auth/step-up', auth: 'admin', phase: 'next' },
   { method: 'GET', path: '/api/v1/admin/rounds', auth: 'admin', phase: 'next' },
@@ -119,9 +117,6 @@ export const routes: readonly RouteSpec[] = [
   { method: 'GET', path: '/api/v1/admin/rounds/:id/next-candidates', auth: 'admin', phase: 'next' },
   { method: 'POST', path: '/api/v1/admin/characters', auth: 'step_up', phase: 'next' },
   { method: 'PATCH', path: '/api/v1/admin/characters/:id', auth: 'step_up', phase: 'next' },
-  { method: 'DELETE', path: '/api/v1/admin/comments/:id', auth: 'step_up', phase: 'next' },
-  { method: 'GET', path: '/api/v1/admin/reports', auth: 'admin', phase: 'next' },
-  { method: 'PATCH', path: '/api/v1/admin/reports/:id', auth: 'step_up', phase: 'next' },
   { method: 'GET', path: '/api/v1/admin/audit', auth: 'admin', phase: 'next' },
   { method: 'POST', path: '/api/v1/admin/rewards', auth: 'step_up', idempotent: true, phase: 'next' },
   { method: 'POST', path: '/api/v1/admin/uploads', auth: 'step_up', phase: 'next' }
