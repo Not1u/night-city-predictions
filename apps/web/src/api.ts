@@ -1,5 +1,6 @@
 import { ApiError, type ApiEnvelope, type ApiFailure, type Me, type Round, type RoundCharacter, type Page, type LedgerEntry, type Prediction, type Comment, type PredictionRequest, assertPoints } from '@night-city/contracts';
 import { demoRounds, emptyRoundCharacters } from '../../../packages/contracts/src/fixtures';
+import { authToken, signOut } from './auth';
 export interface Client {
   mode: 'mock' | 'api'; serverOffset: number;
   rounds(): Promise<Round[]>; characters(round: string): Promise<RoundCharacter[]>;
@@ -82,18 +83,25 @@ class HttpClient implements Client {
   mode = 'api' as const; serverOffset = 0;
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     let response: Response;
-    try { response = await fetch((import.meta.env?.VITE_API_BASE_URL ?? '') + '/api/v1' + path, { credentials: 'include', ...init }); }
+    const token = await authToken();
+    const headers = new Headers(init?.headers);
+    if (token) headers.set('Authorization',`Bearer ${token}`);
+    try { response = await fetch((import.meta.env?.VITE_API_BASE_URL ?? '') + '/api/v1' + path, { ...init, headers, signal: AbortSignal.timeout(15000) }); }
     catch { throw new ApiError('NETWORK_ERROR','无法连接服务，请检查网络后重试'); }
-    const json = await response.json() as ApiEnvelope<T> | ApiFailure;
+    let json: ApiEnvelope<T> | ApiFailure;
+    try { json = await response.json(); } catch { throw new ApiError('NETWORK_ERROR','服务暂时不可用，请稍后重试'); }
     this.serverOffset = Date.parse(json.meta.server_time) - Date.now();
     if ('error' in json) throw new ApiError(json.error.code,json.error.message,response.status);
     return json.data;
   }
-  private disabled(): never { throw new ApiError('FEATURE_NOT_READY','正式账户与写入功能将在下一阶段接入'); }
+  private disabled(): never { throw new ApiError('FEATURE_NOT_READY','当前开放账户与签到；预测和社区稍后开放'); }
   async rounds() { return (await this.request<Page<Round>>('/rounds')).items; }
   async characters(id:string) { return (await this.request<Page<RoundCharacter>>(`/rounds/${encodeURIComponent(id)}/characters`)).items; }
-  async me():Promise<Me|null> { try{return await this.request<Me>('/me');}catch(e){if(e instanceof ApiError && e.code==='UNAUTHENTICATED') return null; throw e;} }
-  async login(){this.disabled();} async logout(){this.disabled();} async checkIn(){this.disabled();} async predict(){this.disabled();}
+  async me():Promise<Me|null> { if (!await authToken()) return null; try{return await this.request<Me>('/me');}catch(e){if(e instanceof ApiError && e.code==='UNAUTHENTICATED') return null; throw e;} }
+  async login(){await this.request('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true})});}
+  async logout(){await signOut();}
+  async checkIn(key:string){await this.request('/check-ins',{method:'POST',headers:{'Idempotency-Key':key}});}
+  async predict(){this.disabled();}
   async ledger(){return (await this.request<Page<LedgerEntry>>('/me/ledger')).items;}
   async predictions(id:string){return (await this.request<Page<Prediction>>(`/me/predictions?round_id=${encodeURIComponent(id)}`)).items;}
   async comments(id:string){return (await this.request<Page<Comment>>(`/characters/${encodeURIComponent(id)}/comments`)).items;}

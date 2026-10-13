@@ -1,4 +1,15 @@
-# 夜城命运档案
+# 死人大乐透
+
+在线地址：[死人大乐透](https://not1u.github.io/night-city-predictions/)。前台由 GitHub Pages 发布，Cloudflare Workers + D1 保存本站账户与积分；Appwrite 提供邮箱验证码和会话管理。
+
+## 当前公开版本：账户试营业
+
+- 原创夜城电台黑色幽默文案；按钮使用轻抬升、柔光及按压反馈。
+- 邮箱验证码自动注册/登录、退出登录，邮箱不会作为公开昵称。
+- 每日 UTC 签到 50 €$，服务端积分余额和流水，支持跨设备账户。
+- 真实轮次保持未开盘：预测、结算与公开留言尚未开放。本地 mock 数据不迁移为真实积分。
+
+线上构建参数在 `.github/workflows/pages.yml`，只有公开项目标识与服务地址，没有 Appwrite 服务端密钥。后端配置在 `apps/api/wrangler.production.jsonc`，用 `npx wrangler deploy --config apps/api/wrangler.production.jsonc` 发布；前端推送 main 自动更新。
 
 《赛博朋克：边缘行者 2》非官方、非盈利粉丝预测站。18+；夜城欧元是无现实价值的虚拟积分，不支持充值、提现、兑换、转让或交易。
 
@@ -55,7 +66,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8787
 
 本地运行 `npm run build:pages` 可生成相同的发布文件，输出在 `apps/web/dist`。图片和脚本使用相对路径，支持 GitHub 仓库子路径以及后续绑定独立域名。发布内容仅包含前台演示；管理端、数据库和 Worker 不会部署到 Pages。
 
-线上演示的数据仍保存在访问者自己的浏览器中，不共享账户、钱包或留言。GitHub Pages 不运行本项目的后端，真实登录和公共数据需要后续单独部署 API 与数据库。
+线上账户与签到已经连接独立后端；本地默认 `mock` 仍是浏览器内演示。GitHub Pages 仅发布前台，不承载数据库。邮箱验证码服务使用 Appwrite 免费方案，实际发送与登录受平台额度和限流约束。
 
 ### 本地检查
 

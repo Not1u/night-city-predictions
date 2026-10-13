@@ -1,1 +1,1 @@
-{"name":"@night-city/web","version":"0.1.0","private":true,"type":"module"}
+{"name":"@night-city/web","version":"0.1.0","private":true,"type":"module","dependencies":{"appwrite":"^28.3.0"}}

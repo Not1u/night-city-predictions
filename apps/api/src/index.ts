@@ -1,6 +1,8 @@
 import { ApiError, type CharacterOdds, type Round, type RoundCharacter } from '@night-city/contracts';
 import { requireAdmin, requireUser } from './auth/session';
-export interface Env { DB: D1Database; ALLOWED_ORIGIN: string }
+import { emailUser, registerEmailUser, type EmailAuthEnv } from './auth/email';
+import { accountInfo, checkIn } from './account';
+export interface Env extends EmailAuthEnv { ALLOWED_ORIGIN: string }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -10,20 +12,35 @@ export default {
     if (origin === env.ALLOWED_ORIGIN) {
       headers.set('Access-Control-Allow-Origin', origin);
       headers.set('Access-Control-Allow-Credentials', 'true');
-      headers.set('Access-Control-Allow-Headers', 'Content-Type, Idempotency-Key, X-Admin-Step-Up');
+      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key, X-Admin-Step-Up');
       headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
     }
     const ok = (data: unknown) => Response.json({ data, meta }, { headers });
+    const authenticate = () => env.APPWRITE_PROJECT_ID ? emailUser(request, env) : requireUser(request, env.DB);
     try {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
       if (request.method !== 'GET' && origin !== env.ALLOWED_ORIGIN) throw new ApiError('FORBIDDEN', '请求来源不被允许', 403);
-      if (url.pathname === '/api/v1/health' && request.method === 'GET') return ok({ status: 'ok', phase: 'foundation', writes_enabled: false });
+      if (url.pathname === '/api/v1/health' && request.method === 'GET') return ok({ status: 'ok', phase: 'accounts-beta', accounts_enabled: !!env.APPWRITE_PROJECT_ID, predictions_enabled: false, comments_enabled: false });
+      if (url.pathname === '/api/v1/auth/register' && request.method === 'POST') return ok(await registerEmailUser(request,env));
       if (url.pathname.startsWith('/api/v1/admin/')) {
-        requireAdmin(await requireUser(request, env.DB));
+        requireAdmin(await authenticate());
         if (request.method !== 'GET') throw new ApiError('STEP_UP_REQUIRED', '管理员二次验证尚未接入', 403);
         throw new ApiError('FEATURE_NOT_READY', '管理功能将在后续阶段接入', 503);
       }
-      if (url.pathname === '/api/v1/auth/session' && request.method === 'GET') return ok(await requireUser(request, env.DB));
+      if (url.pathname === '/api/v1/auth/session' && request.method === 'GET') return ok(await authenticate());
+      if (url.pathname === '/api/v1/me' && request.method === 'GET') return ok(await accountInfo(env.DB,await authenticate()));
+      if (url.pathname === '/api/v1/check-ins' && request.method === 'POST') return ok(await checkIn(request,env.DB,await authenticate()));
+      if (url.pathname === '/api/v1/me/ledger' && request.method === 'GET') {
+        const user = await authenticate();
+        const rows = await env.DB.prepare('SELECT id,kind,delta,balance_after,round_id,prediction_id,created_at FROM ledger WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 100').bind(user.id).all();
+        return ok({items:rows.results,next_cursor:null});
+      }
+      if (url.pathname === '/api/v1/me/predictions' && request.method === 'GET') {
+        const user = await authenticate();
+        const rows = await env.DB.prepare('SELECT p.*,sp.amount AS payout FROM predictions p LEFT JOIN payouts sp ON sp.prediction_id=p.id WHERE p.user_id=? AND p.round_id=? ORDER BY p.created_at DESC LIMIT 100').bind(user.id,url.searchParams.get('round_id') || '').all();
+        return ok({items:rows.results,next_cursor:null});
+      }
+      if (/^\/api\/v1\/characters\/[^/]+\/comments$/.test(url.pathname) && request.method === 'GET') return ok({items:[],next_cursor:null});
       if (url.pathname === '/api/v1/rounds' && request.method === 'GET') {
         const rows = await env.DB.prepare(`SELECT r.*, COALESCE(SUM(p.amount),0) AS pool_total, COUNT(DISTINCT p.user_id) AS participant_count FROM rounds r LEFT JOIN predictions p ON p.round_id=r.id GROUP BY r.id ORDER BY episode`).all<Round>();
         return ok({ items: rows.results, next_cursor: null });
@@ -41,8 +58,8 @@ export default {
         });
         return ok({ items, next_cursor: null });
       }
-      if (url.pathname.startsWith('/api/v1/me') || request.method !== 'GET') await requireUser(request, env.DB);
-      throw new ApiError('FEATURE_NOT_READY', '第一阶段只开放资料读取，账户及积分写入尚未接入', 503);
+      if (url.pathname.startsWith('/api/v1/me') || request.method !== 'GET') await authenticate();
+      throw new ApiError('FEATURE_NOT_READY', '当前开放账户与签到；预测和社区将在后续开放', 503);
     } catch (error) {
       const e = error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', '服务暂时不可用，请稍后重试', 500);
       return Response.json({ error: { code: e.code, message: e.message }, meta }, { status: e.status, headers });

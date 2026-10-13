@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "night-city-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGIN": "https://not1u.github.io",
+    "APPWRITE_ENDPOINT": "https://sgp.cloud.appwrite.io/v1",
+    "APPWRITE_PROJECT_ID": "6ace5d2d0013cced1e83"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "night-city-production",
+    "database_id": "c08c9714-b7cc-4d14-9101-208279ea9fb2",
+    "migrations_dir": "../../db/migrations"
+  }]
+}
