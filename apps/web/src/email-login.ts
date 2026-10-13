@@ -39,6 +39,7 @@ export function mountEmailLogin(container: HTMLElement, done: () => Promise<void
       if(activeSession){await done();return;}
       if(!challenge){await send();return;}
       await verifyEmailCode(challenge.userId,code.value.trim());activeSession=true;
+      if(disposed)return;
       await done();
     } catch(e){if(!disposed)error.textContent=e instanceof Error?e.message:'登录暂时失败，请重试';}
     finally{if(!disposed)setBusy(false);}

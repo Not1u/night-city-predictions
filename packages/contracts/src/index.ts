@@ -71,6 +71,8 @@ export interface PredictionRequest { character_id: ID; amount: number }
 export interface PredictionResponse { prediction: Prediction; wallet: Wallet }
 export interface CheckInResponse { reward: number; date: string; wallet: Wallet; ledger: LedgerEntry }
 export interface CommentRequest { body: string }
+/** Email ownership is checked by Appwrite; the API accepts only a verified bearer JWT. */
+export interface RegisterRequest { consent: true }
 export interface ReportRequest { reason: 'spoiler' | 'abuse' | 'spam' | 'other'; detail?: string }
 export interface AdminRoundRequest { episode: number; title: string; opens_at: UTCDateTime; closes_at: UTCDateTime; previous_round_id: ID | null }
 export interface AdminCharacterRequest { name: string; codename: string; group: Character['group']; bio: string; source_url: string | null }
@@ -85,6 +87,7 @@ export const routes: readonly RouteSpec[] = [
   { method: 'GET', path: '/api/v1/rounds/:id/characters', auth: 'public', phase: 'read' },
   { method: 'GET', path: '/api/v1/rounds/:id/odds', auth: 'public', phase: 'read' },
   { method: 'GET', path: '/api/v1/auth/session', auth: 'user', phase: 'read' },
+  { method: 'POST', path: '/api/v1/auth/register', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me/ledger', auth: 'user', phase: 'next' },
   { method: 'GET', path: '/api/v1/me/predictions?round_id=:id', auth: 'user', phase: 'next' },

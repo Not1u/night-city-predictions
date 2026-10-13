@@ -107,4 +107,4 @@ document.addEventListener('click',e=>{const t=(e.target as HTMLElement).closest<
 document.querySelector('#search')!.addEventListener('input',e=>{query=(e.target as HTMLInputElement).value.trim().toLowerCase();renderCards();});
 document.querySelector('#round')!.addEventListener('change',e=>{selected=(e.target as HTMLSelectElement).value;void load();});
 async function load(){try{await refresh();}catch(e){document.querySelector('#cards')!.innerHTML=`<div class="empty"><h3>信号暂时中断</h3><p>${esc(e instanceof Error?e.message:'无法加载数据')}</p><button class="button outline" data-action="retry">重新连接</button></div>`;}}
-void load();setInterval(updateTime,1000);
+renderAccount();void load();setInterval(updateTime,1000);

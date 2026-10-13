@@ -275,7 +275,7 @@ html[data-motion="off"] { scroll-behavior: auto; }
   *,*:before,*:after { animation: none!important; transition: none!important; }
   .motion-ready .reveal:not(.is-visible) { opacity: 1; transform: none; }
 }
-.email-login-form .field input { font: 16px/1.5 inherit; color: #f3efec; }
+.email-login-form .field input { font-size: 16px; line-height: 1.5; font-family: inherit; color: #f3efec; }
 .email-login-form input[name=code] { font: 26px/1.5 monospace; letter-spacing: 9px; color: var(--yellow); }
 .auth-error { color: #ff8ca3; min-height: 20px; font-size: 12px; }
 .auth-privacy { font-size: 11px; color: #aca6a0; }

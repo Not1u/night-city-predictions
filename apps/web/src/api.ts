@@ -83,7 +83,8 @@ class HttpClient implements Client {
   mode = 'api' as const; serverOffset = 0;
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     let response: Response;
-    const token = await authToken();
+    const needsAuth = path.startsWith('/me') || path.startsWith('/auth') || (init?.method && init.method !== 'GET');
+    const token = needsAuth ? await authToken() : null;
     const headers = new Headers(init?.headers);
     if (token) headers.set('Authorization',`Bearer ${token}`);
     try { response = await fetch((import.meta.env?.VITE_API_BASE_URL ?? '') + '/api/v1' + path, { ...init, headers, signal: AbortSignal.timeout(15000) }); }

@@ -24,7 +24,11 @@ export async function checkIn(request: Request, db: D1Database, user: User): Pro
       db.prepare("INSERT INTO ledger(id,user_id,kind,delta,balance_after,reference_id,created_at) SELECT ?,?,'check_in',50,balance+50,?,? FROM wallets WHERE user_id=?").bind(id,user.id,date,now,user.id),
       db.prepare('UPDATE wallets SET balance=balance+50,version=version+1 WHERE user_id=?').bind(user.id),
       db.prepare('INSERT INTO check_ins(user_id,utc_date,ledger_id) VALUES(?,?,?)').bind(user.id,date,id),
-      db.prepare("INSERT INTO idempotency_keys(user_id,key,method,path,request_hash,response_json,status_code,created_at) SELECT ?,?,'POST','/api/v1/check-ins','check-in:v1',json_object('reward',50,'date',?,'balance',balance),200,? FROM wallets WHERE user_id=?").bind(user.id,key,date,now,user.id)
+      db.prepare(`INSERT INTO idempotency_keys(user_id,key,method,path,request_hash,response_json,status_code,created_at)
+        SELECT ?,?,'POST','/api/v1/check-ins','check-in:v1',json_object('reward',50,'date',?,
+          'wallet',json_object('balance',balance,'currency','EUR_NC','checked_in_today',json('true')),
+          'ledger',json_object('id',?,'kind','check_in','delta',50,'balance_after',balance,'round_id',NULL,'prediction_id',NULL,'created_at',?)),200,?
+        FROM wallets WHERE user_id=?`).bind(user.id,key,date,id,now,now,user.id)
     ]);
   } catch (error) {
     const repeated = await replay(); if (repeated) return repeated;

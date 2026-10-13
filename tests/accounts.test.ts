@@ -69,7 +69,7 @@ test('concurrent daily check-ins credit exactly once; replay and account isolati
   assert.deepEqual(attempts.map(r=>r.status).sort(),[200,409]);
   const winning=attempts[0].status===200?'key-alice1':'key-alice2';
   const replay=await call('/check-ins','POST','alice',undefined,winning);
-  assert.equal(replay.status,200);assert.equal((await replay.json() as any).data.balance,50);
+  assert.equal(replay.status,200);assert.equal((await replay.json() as any).data.wallet.balance,50);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM ledger').get()!.n,1);
   const alice=await (await call('/me','GET','alice')).json() as any;
   const bob=await (await call('/me','GET','bob')).json() as any;
