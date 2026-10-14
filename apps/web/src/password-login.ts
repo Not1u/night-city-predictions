@@ -1,4 +1,5 @@
 import { workerPasswordAuth, workerSession, setWorkerSession } from './auth';
+import { apiBase, requestJson, checkConnection } from './transport';
 type Mode='login'|'register'|'recover'|'password'|'claim';
 /** Passwords and recovery codes never enter storage or logs. Cross-origin beta stores only a revocable session in sessionStorage. */
 export function mountPasswordLogin(container:HTMLElement,done:()=>Promise<void>,initial:Mode='login'):()=>void {
@@ -14,21 +15,24 @@ export function mountPasswordLogin(container:HTMLElement,done:()=>Promise<void>,
       <label class="field">${mode==='login'?'密码':'新密码'}<input name="password" type="password" autocomplete="${mode==='login'?'current-password':'new-password'}" minlength="12" maxlength="128" required></label>
       ${mode==='login'?'':'<p class="form-note">至少 12 位。请使用独立的长密码，别和其他网站共用。</p><label class="field">再次输入密码<input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>'}
       ${mode==='register'?'<label class="consent"><input name="consent" type="checkbox" required>我已满 18 岁，了解积分不可充值、提现、兑换或转让。</label><p class="auth-privacy">注册后请保存恢复码。不绑定邮箱；密码和恢复码都遗失时，无法凭用户名找回账户。</p>':''}
-      <p class="auth-error" role="alert"></p>
+      <p class="auth-error" role="alert"></p><p class="form-note" role="status" aria-live="polite"></p>
       <button type="submit" class="button primary">${{login:'登录夜城',register:'注册并保存恢复码',recover:'重设密码',password:'更新密码',claim:'设置密码并迁移'}[mode]} ↗</button>
     </form>
+    <button type="button" class="text-button" data-connection>检测连接</button>
     ${mode==='password'?'':'<div class="auth-links"><button class="text-button" data-mode="login">已有账户</button><button class="text-button" data-mode="register">注册居民</button><button class="text-button" data-mode="recover">忘记密码</button><button class="text-button" data-mode="claim">旧账户迁移</button></div>'}`;
     container.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>{button.disabled=button.dataset.mode===mode;button.onclick=()=>{if(!busy)render(button.dataset.mode as Mode);};});
     const form=container.querySelector('form')!,error=container.querySelector<HTMLElement>('[role=alert]')!;
+    const status=container.querySelector<HTMLElement>('[role=status]')!;
+    const connection=container.querySelector<HTMLButtonElement>('[data-connection]')!;
+    connection.onclick=async()=>{connection.disabled=true;status.textContent='正在检测账户服务连接…';try{const message=await checkConnection();if(!disposed)status.textContent=message;}catch(e){if(!disposed)status.textContent=e instanceof Error?e.message:'连接失败';}finally{connection.disabled=false;}};
     form.onsubmit=async(event)=>{
       event.preventDefault();if(disposed||busy)return;
       const data=Object.fromEntries(new FormData(form)),button=form.querySelector<HTMLButtonElement>('[type=submit]')!;
       if(mode!=='login'&&data.password!==data.confirm){error.textContent='两次输入的密码不一致';return;}
-      busy=true;button.disabled=true;error.textContent='';
+      busy=true;button.disabled=true;connection.disabled=true;error.textContent='';status.textContent='正在提交，请稍候（最长 45 秒）…';
       try {
-        const token=workerPasswordAuth?workerSession():null;
-        const response=await fetch(`${workerPasswordAuth?import.meta.env.VITE_API_BASE_URL??'':''}/api/v1/auth/${mode}`,{method:'POST',credentials:workerPasswordAuth?'omit':'same-origin',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({...data,consent:data.consent==='on'}),signal:AbortSignal.timeout(20000)});
-        const result=await response.json() as {error?:{message:string};data:{recovery_code?:string;session_token?:string}};
+        const token=workerPasswordAuth&&mode==='password'?workerSession():null;
+        const {response,json:result}=await requestJson<{error?:{message:string};data:{recovery_code?:string;session_token?:string}}>(`${workerPasswordAuth?apiBase:''}/api/v1/auth/${mode}`,{method:'POST',credentials:workerPasswordAuth?'omit':'same-origin',headers:{'Content-Type':workerPasswordAuth?'text/plain;charset=UTF-8':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({...data,consent:data.consent==='on'})},45000);
         if(!response.ok||result.error)throw new Error(result.error?.message||'暂时无法登录，请稍后重试');
         if(workerPasswordAuth&&result.data.session_token)setWorkerSession(result.data.session_token);
         if(disposed)return;
@@ -38,8 +42,8 @@ export function mountPasswordLogin(container:HTMLElement,done:()=>Promise<void>,
           container.querySelector('input')!.value=result.data.recovery_code;
           container.querySelector('button')!.onclick=()=>{void done().catch(e=>{container.querySelector('[role=alert]')!.textContent=e instanceof Error?e.message:'加载失败，请刷新';});};
         }else await done();
-      }catch(e){if(!disposed)error.textContent=e instanceof Error?e.message:'无法连接服务，请稍后重试';}
-      finally{busy=false;button.disabled=false;}
+      }catch(e){if(!disposed){error.textContent=e instanceof Error?e.message:'无法连接服务，请稍后重试';status.textContent=mode==='register'?'如果请求已到达服务器，账户可能已创建。请先尝试登录；登录成功后可在账户中修改密码，重新生成恢复码。':['password','recover','claim'].includes(mode)?'如果提交超时，请先尝试使用新密码登录。':'可检测连接后重试。';}}
+      finally{busy=false;button.disabled=false;connection.disabled=false;}
     };
   };
   render(initial);return ()=>{disposed=true;container.querySelectorAll('input').forEach(input=>{input.value='';});};

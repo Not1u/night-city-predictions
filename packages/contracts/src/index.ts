@@ -9,6 +9,7 @@ export type UTCDateTime = string;
 export type RoundStatus = 'draft' | 'open' | 'closed' | 'result_pending' | 'settled' | 'refunded';
 export interface Ratio { numerator: number; denominator: number }
 export interface Round {
+  payout_rule?: 'stake-v1' | 'cold-v2';
   is_test?: boolean | number;
   id: ID; episode: number; title: string; status: RoundStatus;
   opens_at: UTCDateTime | null; closes_at: UTCDateTime | null;

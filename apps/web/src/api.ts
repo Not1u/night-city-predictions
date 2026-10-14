@@ -2,6 +2,8 @@ import { ApiError, type ApiEnvelope, type ApiFailure, type Me, type Round, type 
 import { demoRounds, emptyRoundCharacters } from '../../../packages/contracts/src/fixtures';
 import { authToken, signOut, passwordAuth, authPaused, localDemo, workerPasswordAuth, workerSession, setWorkerSession } from './auth';
 import { randomInt, slotSymbol, slotMultiplier, rouletteMultiplier } from '../../api/src/play';
+import { apiBase, requestJson } from './transport';
+import { referenceOdds } from '../../../packages/contracts/src/odds';
 import type { GameRequest, GameReceipt, GameHistory, Leaderboard } from '@night-city/contracts';
 export interface Client {
   mode: 'mock' | 'api'; serverOffset: number;
@@ -52,16 +54,16 @@ export class MockClient implements Client {
   async rounds() {
     return this.state.rounds.map(r => {
       const orders = this.state.predictions.filter(p => p.round_id === r.id);
-      return { ...r, status: r.status === 'open' && Date.parse(r.closes_at!) <= Date.now() ? 'closed' as const : r.status, pool_total: orders.reduce((sum,p) => sum + p.amount,0), participant_count: new Set(orders.map(p=>p.user_id)).size };
+      return { ...r, payout_rule:'cold-v2' as const, status: r.status === 'open' && Date.parse(r.closes_at!) <= Date.now() ? 'closed' as const : r.status, pool_total: orders.reduce((sum,p) => sum + p.amount,0), participant_count: new Set(orders.map(p=>p.user_id)).size };
     });
   }
   async characters(round: string) {
     const orders = this.state.predictions.filter(p => p.round_id === round);
-    const total = orders.reduce((sum,p) => sum + p.amount,0);
+    const entries=emptyRoundCharacters().map(c=>({id:c.id,stake_total:orders.filter(p=>p.character_id===c.id).reduce((sum,p)=>sum+p.amount,0)}));
     return emptyRoundCharacters().map(c => {
       const own = orders.filter(p => p.character_id === c.id);
       const stake = own.reduce((sum,p) => sum + p.amount,0);
-      return { ...c, odds: { ...c.odds, stake_total: stake, participant_count: new Set(own.map(p=>p.user_id)).size, live_reference: stake ? { numerator: total, denominator: stake } : null } };
+      return { ...c, odds: { ...c.odds, stake_total: stake, participant_count: new Set(own.map(p=>p.user_id)).size, live_reference: referenceOdds(entries,c.id,'cold-v2') } };
     });
   }
   async me(): Promise<Me | null> { return this.state.loggedIn ? { user: { id: 'demo-user', display_name: this.state.displayName??'夜城访客', role: 'user' }, wallet: { balance: this.state.balance, currency: 'EUR_NC', checked_in_today: this.state.date === new Date().toISOString().slice(0,10) } } : null; }
@@ -100,10 +102,9 @@ class HttpClient implements Client {
     const token = needsAuth ? workerPasswordAuth?workerSession():!passwordAuth?await authToken():null : null;
     const headers = new Headers(init?.headers);
     if (token) headers.set('Authorization',`Bearer ${token}`);
-    try { response = await fetch((import.meta.env?.VITE_API_BASE_URL ?? '') + '/api/v1' + path, { ...init, headers, credentials:workerPasswordAuth?'omit':'include', signal: AbortSignal.timeout(15000) }); }
-    catch { throw new ApiError('NETWORK_ERROR','无法连接服务，请检查网络后重试'); }
-    let json: ApiEnvelope<T> | ApiFailure;
-    try { json = await response.json(); } catch { throw new ApiError('NETWORK_ERROR','服务暂时不可用，请稍后重试'); }
+    const result = await requestJson<ApiEnvelope<T> | ApiFailure>(apiBase + '/api/v1' + path, { ...init, headers, credentials:workerPasswordAuth?'omit':'include' });
+    response=result.response;
+    const json=result.json;
     this.serverOffset = Date.parse(json.meta.server_time) - Date.now();
     if ('error' in json) throw new ApiError(json.error.code,json.error.message,response.status);
     return json.data;

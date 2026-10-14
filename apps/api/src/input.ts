@@ -1,6 +1,7 @@
 import { ApiError } from '@night-city/contracts';
-export async function jsonBody(request: Request): Promise<Record<string,unknown>> {
-  if(!request.headers.get('Content-Type')?.startsWith('application/json')) throw new ApiError('INVALID_INPUT','请求格式不正确');
+export async function jsonBody(request: Request, allowPlainJson=false): Promise<Record<string,unknown>> {
+  const type=request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
+  if(type!=='application/json'&&!(allowPlainJson&&type==='text/plain')) throw new ApiError('INVALID_INPUT','请求格式不正确');
   const text=await request.text();
   try { if(text.length>4096) throw new Error(); const value=JSON.parse(text); if(!value||Array.isArray(value)||typeof value!=='object')throw new Error();return value; }
   catch {throw new ApiError('INVALID_INPUT','请求内容不正确或过长');}

@@ -5,6 +5,25 @@ import api from '../apps/api/src/index';
 import {migrate,d1Adapter} from '../apps/server/database';
 import {digest,passwordMatches} from '../apps/server/passwords';
 const pass='night-city-test-password-3077',origin='https://site.test';
+test('mobile simple auth requests avoid preflight but still enforce origin and JSON limits',async()=>{
+ const db=new DatabaseSync(':memory:');migrate(db);
+ const env={DB:d1Adapter(db),ALLOWED_ORIGIN:origin,WORKER_PASSWORD_AUTH:true};
+ const request=(source:string,body:string,type='text/plain;charset=UTF-8')=>api.fetch(new Request('https://api.test/api/v1/auth/register',{method:'POST',headers:{Origin:source,'Content-Type':type},body}),env);
+ try{
+  const body=JSON.stringify({username:'手机居民',password:pass,consent:true});
+  assert.equal((await request('https://evil.test',body)).status,403);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM password_credentials').get()!.n,0);
+  assert.equal((await request(origin,'x'.repeat(4097))).status,400);
+  assert.equal((await request(origin,'[]')).status,400);
+  assert.equal((await request(origin,body,'application/x-www-form-urlencoded')).status,400);
+  const registered=await request(origin,body);
+  assert.equal(registered.status,200);assert.equal(registered.headers.get('Access-Control-Allow-Origin'),origin);
+  const login=await api.fetch(new Request('https://api.test/api/v1/auth/login',{method:'POST',headers:{Origin:origin,'Content-Type':'text/plain'},body}),env);
+  assert.equal(login.status,200);
+  const preflight=await api.fetch(new Request('https://api.test/api/v1/auth/password',{method:'OPTIONS',headers:{Origin:origin}}),env);
+  assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Max-Age'),'600');
+ }finally{db.close();}
+});
 function fixture(){
  const db=new DatabaseSync(':memory:');migrate(db);const env={DB:d1Adapter(db),ALLOWED_ORIGIN:origin,WORKER_PASSWORD_AUTH:true};
  const call=async(path:string,body?:unknown,token?:string,key?:string,source=origin)=>{const response=await api.fetch(new Request('https://api.test/api/v1'+path,{method:body===undefined?'GET':'POST',headers:{Origin:source,'CF-Connecting-IP':'fixture','Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(key?{'Idempotency-Key':key}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);return {status:response.status,...await response.json() as any};};
@@ -19,7 +38,7 @@ test('five independent password accounts share live pools but never private bala
   assert.equal(new Set(ids).size,5);const saved=f.db.prepare('SELECT password_hash FROM password_credentials').get()!;assert.equal(await passwordMatches(pass,String(saved.password_hash)),true);
   assert.equal((await f.call('/rounds/beta-sandbox/predictions',{character_id:'weak',amount:10},tokens[0],'predict-one')).status,200);
   assert.equal((await f.call('/rounds/beta-sandbox/predictions',{character_id:'d',amount:20},tokens[1],'predict-two')).status,200);
-  const publicOdds=await f.call('/rounds/beta-sandbox/odds');assert.deepEqual(publicOdds.data.items.find((v:any)=>v.character_id==='weak').live_reference,{numerator:30,denominator:10});assert.deepEqual(publicOdds.data.items.find((v:any)=>v.character_id==='d').live_reference,{numerator:30,denominator:20});
+  const publicOdds=await f.call('/rounds/beta-sandbox/odds');assert.deepEqual(publicOdds.data.items.find((v:any)=>v.character_id==='weak').live_reference,{numerator:2000000,denominator:1000000});assert.deepEqual(publicOdds.data.items.find((v:any)=>v.character_id==='d').live_reference,{numerator:500000,denominator:1000000});
   assert.equal((await f.call('/me',undefined,tokens[0])).data.wallet.balance,40);assert.equal((await f.call('/me',undefined,tokens[1])).data.wallet.balance,30);
   assert.equal((await f.call('/me/predictions?round_id=beta-sandbox&user_id='+ids[0],undefined,tokens[2])).data.items.length,0);
   assert.equal((await f.call('/admin/users',undefined,tokens[0])).status,403);assert.equal((await f.call('/me',undefined,'a'.repeat(43))).status,401);

@@ -19,7 +19,8 @@ export async function workerPassword(request:Request,env:Env):Promise<unknown>{
  if(request.headers.get('Origin')!==env.ALLOWED_ORIGIN)throw new ApiError('FORBIDDEN','请求来源不被允许',403);
  const ip=request.headers.get('CF-Connecting-IP')??'local';await limit(db,'password-ip:'+ip,40);
  if(path.endsWith('/logout')){const token=request.headers.get('Authorization')?.slice(7)??'';await db.batch([db.prepare('UPDATE sessions SET revoked_at=? WHERE token_hash=?').bind(now,digest(token))]);return {ok:true};}
- const body=await jsonBody(request),pass=validatePassword(body.password);
+ // Origin is checked above even for simple CORS requests; no third-party cookies are accepted.
+ const body=await jsonBody(request,true),pass=validatePassword(body.password);
  let id:string,hash:string,recovery:string|undefined;const token=secret();
  if(path.endsWith('/password')){
   const user=await requireUser(request,db,new Date(),undefined,true,true);await limit(db,'password-change:'+ip+':'+user.id,6);
