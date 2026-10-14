@@ -3,7 +3,12 @@ import { ApiError } from '@night-city/contracts';
 
 const endpoint = import.meta.env?.VITE_APPWRITE_ENDPOINT;
 const project = import.meta.env?.VITE_APPWRITE_PROJECT_ID;
-export const passwordAuth = import.meta.env?.VITE_AUTH_MODE === 'password';
+export const workerPasswordAuth = import.meta.env?.VITE_AUTH_MODE === 'password-worker';
+export const passwordAuth = import.meta.env?.VITE_AUTH_MODE === 'password' || workerPasswordAuth;
+const SESSION_KEY='night-city-api-session-v1';
+let memorySession:string|null=null;
+export function workerSession(){try{return sessionStorage.getItem(SESSION_KEY)??memorySession;}catch{return memorySession;}}
+export function setWorkerSession(token:string|null){memorySession=token;try{if(token)sessionStorage.setItem(SESSION_KEY,token);else sessionStorage.removeItem(SESSION_KEY);}catch{}}
 export const authPaused = import.meta.env?.VITE_AUTH_MODE === 'paused';
 export const localDemo = typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === '1';
 export const emailAuthReady = !passwordAuth && !authPaused && !localDemo && !!endpoint && !!project;

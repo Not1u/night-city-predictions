@@ -1,5 +1,6 @@
+import { workerPasswordAuth, workerSession, setWorkerSession } from './auth';
 type Mode='login'|'register'|'recover'|'password'|'claim';
-/** Passwords and recovery codes never enter localStorage or logs. Session is HttpOnly. */
+/** Passwords and recovery codes never enter storage or logs. Cross-origin beta stores only a revocable session in sessionStorage. */
 export function mountPasswordLogin(container:HTMLElement,done:()=>Promise<void>,initial:Mode='login'):()=>void {
   let disposed=false, busy=false;
   const render=(mode:Mode)=>{
@@ -25,9 +26,11 @@ export function mountPasswordLogin(container:HTMLElement,done:()=>Promise<void>,
       if(mode!=='login'&&data.password!==data.confirm){error.textContent='两次输入的密码不一致';return;}
       busy=true;button.disabled=true;error.textContent='';
       try {
-        const response=await fetch(`/api/v1/auth/${mode}`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,consent:data.consent==='on'}),signal:AbortSignal.timeout(20000)});
-        const result=await response.json() as {error?:{message:string};data:{recovery_code?:string}};
+        const token=workerPasswordAuth?workerSession():null;
+        const response=await fetch(`${workerPasswordAuth?import.meta.env.VITE_API_BASE_URL??'':''}/api/v1/auth/${mode}`,{method:'POST',credentials:workerPasswordAuth?'omit':'same-origin',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({...data,consent:data.consent==='on'}),signal:AbortSignal.timeout(20000)});
+        const result=await response.json() as {error?:{message:string};data:{recovery_code?:string;session_token?:string}};
         if(!response.ok||result.error)throw new Error(result.error?.message||'暂时无法登录，请稍后重试');
+        if(workerPasswordAuth&&result.data.session_token)setWorkerSession(result.data.session_token);
         if(disposed)return;
         form.reset();
         if(result.data.recovery_code){

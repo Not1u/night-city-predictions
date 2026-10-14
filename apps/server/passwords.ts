@@ -2,14 +2,16 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from 'node:crypto';
 import { ApiError } from '@night-city/contracts';
 // OWASP scrypt equivalent cost: N=2^14,r=8,p=5. Native async work, bounded concurrency.
 let hashing=0;
+const waiting:(()=>void)[]=[];
+async function acquire(){if(hashing<2){hashing++;return;}if(waiting.length>=8)throw new ApiError('RATE_LIMITED','登录请求较多，请稍后重试',429);await new Promise<void>(resolve=>waiting.push(resolve));}
+function release(){const next=waiting.shift();if(next)next();else hashing--;}
 const derive=(password:string,salt:string)=>new Promise<Buffer>((resolve,reject)=>scrypt(password,salt,32,{N:16384,r:8,p:5,maxmem:32*1024*1024},(e,key)=>e?reject(e):resolve(key)));
 export function validatePassword(value:unknown):string {
   if(typeof value!=='string'||value.length<12||value.length>128||Buffer.byteLength(value)>512)throw new ApiError('INVALID_INPUT','密码需要 12–128 位，建议使用不重复的长密码');
   return value;
 }
 export async function passwordHash(password:string,salt=randomBytes(16).toString('hex')) {
-  if(hashing>=2)throw new ApiError('RATE_LIMITED','登录请求较多，请稍后重试',429);
-  hashing++;try{return `scrypt-v1$${salt}$${(await derive(password,salt)).toString('hex')}`;}finally{hashing--;}
+  await acquire();try{return `scrypt-v1$${salt}$${(await derive(password,salt)).toString('hex')}`;}finally{release();}
 }
 export async function passwordMatches(password:string,encoded:string) {
   const parts=encoded.split('$');if(parts.length!==3||parts[0]!=='scrypt-v1'||!(/^[a-f0-9]{32}$/).test(parts[1])||!(/^[a-f0-9]{64}$/).test(parts[2]))return false;

@@ -3,9 +3,11 @@
   "name": "night-city-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "vars": {
     "ALLOWED_ORIGIN": "https://not1u.github.io",
+    "WORKER_PASSWORD_AUTH": true,
     "APPWRITE_ENDPOINT": "https://sgp.cloud.appwrite.io/v1",
     "APPWRITE_PROJECT_ID": "6ace5d2d0013cced1e83"
   },

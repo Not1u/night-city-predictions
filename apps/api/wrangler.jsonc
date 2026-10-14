@@ -3,6 +3,7 @@
   "name": "night-city-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
   "vars": { "ALLOWED_ORIGIN": "http://127.0.0.1:5173" },
   "d1_databases": [{
     "binding": "DB",
