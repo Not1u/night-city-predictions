@@ -1,6 +1,7 @@
 import { ApiError, type ApiEnvelope, type ApiFailure, type Me, type Round, type RoundCharacter, type Page, type LedgerEntry, type Prediction, type PredictionRequest, assertPoints } from '@night-city/contracts';
 import { demoRounds, emptyRoundCharacters } from '../../../packages/contracts/src/fixtures';
-import { authToken, signOut, passwordAuth } from './auth';
+import { authToken, signOut, passwordAuth, authPaused, localDemo } from './auth';
+import { randomInt, slotSymbol, slotMultiplier, rouletteMultiplier } from '../../api/src/play';
 import type { GameRequest, GameReceipt, GameHistory, Leaderboard } from '@night-city/contracts';
 export interface Client {
   mode: 'mock' | 'api'; serverOffset: number;
@@ -12,7 +13,7 @@ export interface Client {
   checkIn(key: string): Promise<void>; predict(round: string, body: PredictionRequest, key: string): Promise<void>;
   ledger(): Promise<LedgerEntry[]>; predictions(round: string): Promise<Prediction[]>;
 }
-interface DemoState { displayName?:string; version: 1; rounds: Round[]; loggedIn: boolean; balance: number; date: string | null; ledger: LedgerEntry[]; predictions: Prediction[]; keys: Record<string,string> }
+interface DemoState { displayName?:string; gameReceipts?:Record<string,GameReceipt>; lastPlay?:number; version: 1; rounds: Round[]; loggedIn: boolean; balance: number; date: string | null; ledger: LedgerEntry[]; predictions: Prediction[]; keys: Record<string,string> }
 const STORAGE = 'night-city-demo-v1';
 /** Browser-only disposable simulation. Never exported to D1 or used as trusted state. */
 export class MockClient implements Client {
@@ -20,8 +21,20 @@ export class MockClient implements Client {
   private state: DemoState;
   async profile(name:string){this.auth();this.state.displayName=name;this.save();}
   async refund(){throw new ApiError('FEATURE_NOT_READY','请在在线测试场退回订单');}
-  async play():Promise<GameReceipt>{throw new ApiError('FEATURE_NOT_READY','小游戏需连接在线服务器');}
-  async games():Promise<GameHistory[]>{return [];}
+  async play(game:'roulette'|'slots',body:GameRequest,key:string):Promise<GameReceipt>{
+    this.auth();assertPoints(body.stake);if(body.stake>50)throw new ApiError('INVALID_INPUT','每局最多 50 演示积分');
+    const fingerprint=JSON.stringify({game,...body});
+    if(this.state.keys[key]){if(this.state.keys[key]!==fingerprint||!this.state.gameReceipts?.[key])throw new ApiError('IDEMPOTENCY_CONFLICT','请求内容不一致');return this.state.gameReceipts[key];}
+    if(game==='roulette'&&(!['red','black','odd','even','low','high','number'].includes(body.choice??'')||(body.choice==='number'&&(!Number.isInteger(body.number)||body.number!<0||body.number!>36))))throw new ApiError('INVALID_INPUT','轮盘选项无效');
+    if(Date.now()-(this.state.lastPlay??0)<3000)throw new ApiError('RATE_LIMITED','请等待 3 秒再试');
+    if(this.state.balance<body.stake)throw new ApiError('INSUFFICIENT_BALANCE','演示积分不足，请先签到');
+    const result=game==='roulette'?{number:randomInt(37)}:{symbols:Array.from({length:3},()=>slotSymbol(randomInt(61)))};
+    const multiplier=game==='roulette'?rouletteMultiplier(result.number!,body.choice!,body.number):slotMultiplier(result.symbols!);
+    this.record('activity_reward',-body.stake);const payout=body.stake*multiplier;if(payout)this.record('activity_reward',payout);
+    const receipt:GameReceipt={id:crypto.randomUUID(),game,stake:body.stake,payout,multiplier,balance:this.state.balance,result,created_at:new Date().toISOString()};
+    this.state.gameReceipts??={};this.state.gameReceipts[key]=receipt;this.state.keys[key]=fingerprint;this.state.lastPlay=Date.now();this.save();return receipt;
+  }
+  async games():Promise<GameHistory[]>{this.auth();return Object.values(this.state.gameReceipts??{}).reverse().slice(0,30).map(r=>({id:r.id,game:r.game,stake:r.stake,payout:r.payout,result_json:JSON.stringify(r.result),created_at:r.created_at}));}
   async leaderboard(kind:'lottery'|'arcade'):Promise<Leaderboard>{return {kind,period:kind==='arcade'?'30d':'settled',items:[],updated_at:new Date().toISOString()};}
   constructor() {
     const empty: DemoState = { version: 1, rounds: demoRounds(), loggedIn: false, balance: 0, date: null, ledger: [], predictions: [], keys: {} };
@@ -83,6 +96,7 @@ class HttpClient implements Client {
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     let response: Response;
     const needsAuth = path.startsWith('/me') || path.startsWith('/auth') || (init?.method && init.method !== 'GET');
+    if(needsAuth&&authPaused)throw new ApiError('FEATURE_NOT_READY','线上账户暂停测试，请进入本地演示');
     const token = needsAuth && !passwordAuth ? await authToken() : null;
     const headers = new Headers(init?.headers);
     if (token) headers.set('Authorization',`Bearer ${token}`);
@@ -110,4 +124,4 @@ class HttpClient implements Client {
   async ledger(){return (await this.request<Page<LedgerEntry>>('/me/ledger')).items;}
   async predictions(id:string){return (await this.request<Page<Prediction>>(`/me/predictions?round_id=${encodeURIComponent(id)}`)).items;}
 }
-export const client: Client = import.meta.env?.VITE_DATA_MODE === 'api' ? new HttpClient() : new MockClient();
+export const client: Client = !localDemo && import.meta.env?.VITE_DATA_MODE === 'api' ? new HttpClient() : new MockClient();

@@ -8,6 +8,7 @@ let selected:'lottery'|'arcade'='lottery',revision=0,initialized=false;
 export async function loadRanking(){
   const list=document.querySelector('#ranking-list'),note=document.querySelector('#ranking-note');if(!list||!note)return;
   if(!initialized){initialized=true;document.querySelectorAll<HTMLButtonElement>('[data-ranking]').forEach(button=>button.onclick=()=>{selected=button.dataset.ranking as typeof selected;void loadRanking();});document.querySelector<HTMLButtonElement>('#ranking-refresh')!.onclick=()=>void loadRanking();}
+  if(client.mode==='mock'){note.textContent='本地演示不参与线上排名';list.textContent='演示积分与游戏结果仅保存在当前浏览器。';return;}
   const version=++revision;document.querySelectorAll<HTMLButtonElement>('[data-ranking]').forEach(b=>{b.classList.toggle('selected',b.dataset.ranking===selected);b.setAttribute('aria-pressed',String(b.dataset.ranking===selected));});
   note.textContent=selected==='lottery'?'正式轮次累计净收益 · 不含测试场':'近 30 天总返还减去全部投入 · 仅正收益';list.textContent='正在读取真实记录…';
   try{const data=await client.leaderboard(selected);if(version!==revision)return;

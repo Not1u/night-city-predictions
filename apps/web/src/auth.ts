@@ -4,7 +4,9 @@ import { ApiError } from '@night-city/contracts';
 const endpoint = import.meta.env?.VITE_APPWRITE_ENDPOINT;
 const project = import.meta.env?.VITE_APPWRITE_PROJECT_ID;
 export const passwordAuth = import.meta.env?.VITE_AUTH_MODE === 'password';
-export const emailAuthReady = !passwordAuth && !!endpoint && !!project;
+export const authPaused = import.meta.env?.VITE_AUTH_MODE === 'paused';
+export const localDemo = typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === '1';
+export const emailAuthReady = !passwordAuth && !authPaused && !localDemo && !!endpoint && !!project;
 const account = emailAuthReady ? new Account(new Client().setEndpoint(endpoint).setProject(project)) : null;
 let jwt: { token: string; expires: number } | null = null;
 
